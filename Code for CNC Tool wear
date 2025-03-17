@@ -1,0 +1,191 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+import warnings
+warnings.filterwarnings('ignore')
+
+from sklearn.linear_model import  LogisticRegression
+from sklearn import svm
+from sklearn import treeimport pandas as pd
+
+from sklearn.neural_network import MLPClassifier
+from sklearn.neighbors import NearestCentroid
+from sklearn.linear_model import SGDClassifier
+
+train=pd.read_csv('../input/tool-wear-detection-in-cnc-mill/train.csv')
+
+print(train.info())
+
+print(train.head())
+
+le1=LabelEncoder()
+le1.fit(train['material'])
+train['Encoded_material']=le1.transform(train['material'])
+
+le2=LabelEncoder()
+le2.fit(train['tool_condition'])
+train['Encoded_tool_condition']=le2.transform(train['tool_condition'])
+
+le3=LabelEncoder()
+le3.fit(train['machining_finalized'])
+train['Encoded_machining_finalized']=le3.transform(train['machining_finalized'])
+
+le4=LabelEncoder()
+le4.fit(train['feedrate'])
+train['Encoded_feedrate']=le4.transform(train['feedrate'])
+
+le5=LabelEncoder()
+le5.fit(train['clamp_pressure'])
+train['Encoded_clamp_pressure']=le5.transform(train['clamp_pressure'])
+
+train.drop(['passed_visual_inspection','tool_condition','material','machining_finalized'],axis=1,inplace=True)
+print(train.info())
+
+plt.figure(figsize=(20,18))
+sns.heatmap(train.corr(),linewidths=.1,annot=True)
+plt.show()
+
+frames = []
+for i in range(1,19):
+    ex_num = '0' + str(i) if i < 10 else str(i)
+    frame = pd.read_csv("../input/tool-wear-detection-in-cnc-mill/experiment_{}.csv".format(ex_num))
+
+    ex_result_row = train[train['No'] == i]
+
+    le6=LabelEncoder()
+    le6.fit(frame['Machining_Process'])
+    frame['Encoded_Machining_Process']=le6.transform(frame['Machining_Process'])
+
+    frame['Encoded_feedrate'] = ex_result_row.iloc[0]['Encoded_feedrate']
+    frame['Encoded_clamp_pressure'] = ex_result_row.iloc[0]['Encoded_clamp_pressure']
+    frames.append(frame)
+
+df = pd.concat(frames, ignore_index=True)
+print(df.head(3))
+print(df.shape)
+
+print(">>>>> Heatmap of frames <<<<<")
+plt.figure(figsize=(50,50))
+sns.heatmap(df.corr(),linewidths=.1,annot=True)
+plt.show()
+plt.savefig('fig.png')
+plt.close('all')
+
+df.drop(['Z1_CurrentFeedback','Z1_DCBusVoltage','Z1_OutputCurrent','Z1_OutputVoltage','S1_SystemInertia'],axis=1,inplace=True)
+
+print(">>>>> Heatmap of frames after drop column <<<<<")
+plt.figure(figsize=(50,50))
+sns.heatmap(df.corr(),linewidths=.1,annot=True)
+plt.show()
+
+corr = df.corr()
+print("\n>>>>> All features Correlation shape <<<<<")
+print(df.corr().shape)
+
+print("\n>>>>> Encoded_feedrate abs Correlation > 0.3 <<<<<")
+cor_feedrate = abs(corr["Encoded_feedrate"])
+relevant_features = cor_feedrate[cor_feedrate>0.3]
+print(relevant_features)
+
+newDf_feedrate = df[['X1_ActualPosition', 'X1_CommandPosition', 'Y1_ActualPosition', 'Y1_CommandPosition', 'Z1_ActualPosition', 'Z1_CommandPosition', 'S1_ActualVelocity', 'S1_CommandVelocity', 'S1_CurrentFeedback', 'S1_DCBusVoltage', 'S1_OutputVoltage', 'S1_OutputPower', 'M1_sequence_number', 'M1_CURRENT_FEEDRATE', 'Encoded_feedrate']]
+print("\n---------- newDf feedrate info: ----------")
+print(newDf_feedrate.info())
+print("---------- newDf feedrate head: ----------")
+print(newDf_feedrate.head(3))
+
+print("\n>>>>> Encoded_clamp_pressure abs Correlation > 0.1 <<<<<")
+cor_clamp_pressure = abs(corr["Encoded_clamp_pressure"])
+
+#Selecting highly correlated features
+relevant_features2 = cor_clamp_pressure[cor_clamp_pressure>0.1]
+print(relevant_features2)
+
+newDf_pressure = df[['X1_ActualPosition', 'X1_CommandPosition', 'X1_OutputCurrent', 'Y1_ActualPosition', 'Y1_CommandPosition', 'Y1_OutputCurrent', 'Z1_ActualPosition', 'Z1_CommandPosition', 'S1_ActualVelocity', 'S1_CommandVelocity', 'S1_OutputVoltage', 'M1_CURRENT_FEEDRATE', 'Encoded_clamp_pressure']]
+print("\n---------- newDf pressure info: ----------")
+print(newDf_pressure.info())
+print("---------- newDf pressure head: ----------")
+print(newDf_pressure.head(3))
+
+y=newDf_feedrate['Encoded_feedrate']
+X=newDf_feedrate.drop(['Encoded_feedrate'], axis=1)
+print("\n========== y.newDf_feedrate(3) ==========")
+print(y.head(3))
+print("\n========== X.newDf_feedrate(3) ==========")
+print(X.head(3))
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=7)
+
+mlp_feedrate = MLPClassifier(solver='lbfgs', alpha=1e-5,hidden_layer_sizes=(5, 2), random_state=1)
+mlp_feedrate.fit(X_train, y_train)
+print("\n========== MLPClassifier score of feedrate  ==========")
+print(mlp_feedrate.score(X_test, y_test))
+
+tree_feedrate = tree.DecisionTreeClassifier()
+tree_feedrate.fit(X_train, y_train)
+print("\n========== DecisionTreeClassifier score of feedrate  ==========")
+print(tree_feedrate.score(X_test, y_test))
+
+predictions_feedrate = tree_feedrate.predict(X_test)
+print("\n========== Prediction_feedrate results  ==========")
+print(predictions_feedrate)
+
+y1=newDf_pressure['Encoded_clamp_pressure']
+X1=newDf_pressure.drop(['Encoded_clamp_pressure'], axis=1)
+print("\n========== y.head(3) ==========")
+print(y1.head(3))
+print("\n========== X.head(3) ==========")
+print(X1.head(3))
+X1_train, X1_test, y1_train, y1_test = train_test_split(X1, y1, test_size=0.3, random_state=7)
+
+mlp_pressure = MLPClassifier(solver='lbfgs', alpha=1e-5,hidden_layer_sizes=(5, 2), random_state=1)
+mlp_pressure.fit(X1_train, y1_train)
+print("\n========== MLPClassifier score of pressure  ==========")
+print(mlp_pressure.score(X1_test, y1_test))
+
+tree_pressure = tree.DecisionTreeClassifier()
+tree_pressure.fit(X1_train, y1_train)
+print("\n========== DecisionTreeClassifier score of pressure  ==========")
+print(tree_pressure.score(X1_test, y1_test))
+
+predictions_pressure = tree_pressure.predict(X1_test)
+print("\n========== Prediction_pressure results  ==========")
+print(predictions_pressure)
+
+finalDf = pd.DataFrame(columns=['feedrate','clampPressure'])
+finalDf['feedrate'] = predictions_feedrate.tolist()
+finalDf['clampPressure'] = predictions_pressure.tolist()
+print("----- finalDf.info() -----")
+print(finalDf.info())
+print("----- finalDf.head(3) -----")
+print(finalDf.head(3))
+
+y_final=train['Encoded_tool_condition']
+X_final=train[['Encoded_feedrate', 'Encoded_clamp_pressure']]
+X_final_train, X_final_test, y_final_train, y_final_test = train_test_split(X_final, y_final, test_size=0.3, random_state=7)
+
+mlp_tool_condition = MLPClassifier(solver='lbfgs', alpha=1e-5,hidden_layer_sizes=(5, 2), random_state=1)
+mlp_tool_condition.fit(X_final_train, y_final_train)
+print("\n========== MLPClassifier score of tool_condition  ==========")
+print(mlp_tool_condition.score(X_final_test, y_final_test))
+
+tree_tool_condition = tree.DecisionTreeClassifier()
+tree_tool_condition.fit(X_final_train, y_final_train)
+print("\n========== DecisionTreeClassifier score of tool_condition  ==========")
+print(tree_tool_condition.score(X_final_test, y_final_test))
+
+pred=SGD_tool_condition.predict(finalDf)
+output=pd.DataFrame({'Feedrate':finalDf['feedrate'], 'Clamp_Pressure':finalDf['clampPressure'], 'Tool_Condition':pred})
+print(output.head(5))
+
+finalDf['feedrate'] = finalDf['feedrate'].apply(np.sign).replace({0.0: 3, 0.1: 6, 0.2: 12, 0.3: 15, 0.4:20})
+finalDf['clampPressure'] = finalDf['clampPressure'].apply(np.sign).replace({0.0: 2.5, 0.1: 3.0, 0.2: 4.0})
+pred = pred.astype(str)
+for i in range(len(pred)):
+    if (pred[i]=='0'):
+        pred[i]='unworn'
+    elif (pred[i]=='1'):
+        pred[i]='worn'
+
+output=pd.DataFrame({'Feedrate':finalDf['feedrate'], 'Clamp_Pressure':finalDf['clampPressure'], 'Tool_Condition':pred})
+print(output.head(5))
